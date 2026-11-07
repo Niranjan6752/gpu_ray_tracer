@@ -41,7 +41,6 @@ SMALL_GPU = -O2 -arch=$(ARCH) -DSCENE=1 -DNO_BALLS -DWIDTH=200 -DHEIGHT=150
 OUT   = ../images/output
 MKOUT = -@mkdir -p $(OUT)
 
-# On Windows (MSYS2 g++) a static build avoids a runtime DLL clash
 ifeq ($(OS),Windows_NT)
 CXXFLAGS  += -static
 SMALL_CPU += -static
@@ -71,7 +70,7 @@ ifdef EXE
 $(CPU_PROGS) $(GPU_PROGS): %: %$(EXE)
 endif
 
-# ---------------- CPU programs ----------------
+# CPU programs
 cpu_fresnel$(EXE): raytracer_cpu_fresnel_reflection.cpp config.h
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
@@ -87,7 +86,7 @@ cpu_bvh_small$(EXE): raytracer_cpu_bvh.cpp config.h
 cpu_brute_small$(EXE): raytracer_cpu_bvh.cpp config.h
 	$(CXX) $(SMALL_CPU) -DBRUTE -o $@ $<
 
-# ---------------- GPU programs ----------------
+# GPU programs
 gpu_fresnel$(EXE): raytracer_gpu_fresnel_reflections.cu config.h
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
@@ -117,7 +116,7 @@ gpu_exp_lay1_8x4$(EXE): raytracer_gpu_exp.cu config.h
 gpu_exp$(EXE): raytracer_gpu_exp.cu config.h
 	$(NVCC) $(NVCCFLAGS) -DLAYOUT=1 -DBLOCK_X=8 -DBLOCK_Y=8 -o $@ $<
 
-# ---------------- commands ----------------
+# commands
 outdir:
 	$(MKOUT)
 
