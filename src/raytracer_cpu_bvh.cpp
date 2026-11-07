@@ -1,6 +1,6 @@
-// ============================================================================
-//  Basic CPU ray tracer  --  starter code
-// ============================================================================
+// CPU ray tracer with a BVH over the bunny mesh (midpoint split, up to 4 triangles
+// per leaf, iterative traversal). -DBRUTE tests every triangle instead.
+// Build: g++ -O2 -o cpu_bvh raytracer_cpu_bvh.cpp
 //  Renders a few spheres on a checkerboard floor, with simple diffuse shading
 //  and hard shadows. Single-threaded, plain C++. No external libraries.
 //
@@ -77,9 +77,7 @@ std::vector<Sphere> scene = {
 #endif
 };
 
-// A ray is a point p(t) = origin + t * dir. This finds where (if anywhere) the
-// ray hits the sphere, returning the nearest distance t in front of the camera,
-// or -1 if it misses. (Solves a quadratic -- see any ray-sphere reference.)
+// Ray-sphere hit: nearest distance t along the ray, or -1 on a miss.
 float hitSphere(const Sphere& s, Vec3 origin, Vec3 dir) {
     Vec3  oc = origin - s.center;
     float a = dot(dir, dir);
@@ -180,8 +178,7 @@ bool closestHit(Vec3 origin, Vec3 dir, Hit& h) {
 
 
 
-// Compute the color seen along one ray.
-// Compute the color seen along one ray (loop version: color + weight).
+// Color seen along one ray (loop version: color + weight).
 Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {
     Vec3  lightPos(4, 6, 2);
     Vec3  ans(0.0f, 0.0f, 0.0f);
@@ -280,7 +277,7 @@ static float centroidOn(const Triangle& t, int a) {
 int build(int first, int count, int depth) {
     if (depth > bvhDepth) bvhDepth = depth;
     int me = (int)nodes.size();
-    nodes.push_back(BVHNode());              // reserve my slot (always use the index, not a reference)
+    nodes.push_back(BVHNode());              // reserve this node's slot (use the index: push_back can move the vector)
 
     // Bounding box of all the triangles here.
     Vec3 lo(1e30f, 1e30f, 1e30f), hi(-1e30f, -1e30f, -1e30f);
@@ -317,7 +314,7 @@ int build(int first, int count, int depth) {
                              return centroidOn(a, axis) < centroidOn(b, axis); });
     }
 
-    build(first, mid - first, depth + 1);                        // left child lands at me + 1
+    build(first, mid - first, depth + 1);                        // left child is at index + 1
     int right = build(mid, first + count - mid, depth + 1);
     nodes[me].rightOrFirst = right;
     nodes[me].count = 0;
@@ -356,11 +353,8 @@ int main() {
            std::chrono::duration<double, std::milli>(b1 - b0).count());
 
 
-    const int W = WIDTH, H = HEIGHT; //Setup image dimensions
-    std::vector<unsigned char> image(W * H * 3);//Total Pixels - Stored as (R, G, B per pixel)
-
-    // TRY IT: move the camera and see how the view changes.
-    // x = right, y = up, z = toward the viewer (spheres sit near z = -1).
+    const int W = WIDTH, H = HEIGHT;
+    std::vector<unsigned char> image(W * H * 3);
     Vec3  cameraPos(0, 1, 3);
     float aspect = (float)W / H;
 

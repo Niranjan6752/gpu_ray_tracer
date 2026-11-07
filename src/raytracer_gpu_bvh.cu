@@ -172,7 +172,7 @@ int build(int first, int count, int depth) {
                              return centroidOn(a, axis) < centroidOn(b, axis); });
     }
 
-    build(first, mid - first, depth + 1);                        // left child lands at me + 1
+    build(first, mid - first, depth + 1);                        // left child is at index + 1
     int right = build(mid, first + count - mid, depth + 1);
     nodes[me].rightOrFirst = right;
     nodes[me].count = 0;

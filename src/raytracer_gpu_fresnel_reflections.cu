@@ -1,6 +1,6 @@
-// CUDA port of the CPU ray tracer. One thread per pixel.
-// build: nvcc -O2 -arch=sm_75 -o raytracer_cuda raytracer_cuda.cu
-// run:   mkdir -p ../images/output && ./raytracer_cuda   (writes ../images/output/image.ppm)
+// CUDA port of raytracer_cpu_fresnel_reflection.cpp: one thread per pixel, spheres in
+// __constant__ memory, reflections as a loop.
+// Build: nvcc -O2 -arch=sm_75 -o gpu_fresnel raytracer_gpu_fresnel_reflections.cu
 
 #include <cstdio>
 #include <cstdlib>
@@ -19,9 +19,6 @@
         }                                                                  \
     } while (0)
 
-// #define ball_reflection 0.1f
-// #define scene_reflection 0.3f
-// #define NUM_BOUNCES 5
 
 // default ctor has to stay trivial or __constant__ won't compile
 struct Vec3 {
@@ -117,9 +114,7 @@ __device__ Vec3 rayColorRecursive(Vec3 origin, Vec3 dir, int bounces) {
 
 
 // Compute the color seen along one ray.
-__device__ Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {// Origin is the CameraPosition, Dir
-    // TRY IT: move the light around and see how shading/shadows change.
-    // x = right, y = up, z = toward the camera.
+__device__ Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {
     Vec3  lightPos(4, 6, 2);
 
     Vec3 ans = {0.0f, 0.0f, 0.0f};
@@ -128,23 +123,18 @@ __device__ Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {// Origin
 
     bounces++;
     while(bounces--){
-        float tHit; //This stores the closest hit point
-        int hit = closestHit(origin, dir, tHit); //The sphere which is being hit by the ray
+        float tHit;
+        int hit = closestHit(origin, dir, tHit);
         
         if (hit < 0) {
             // Miss: draw a simple sky gradient (white near horizon -> blue up top).
             float t = 0.5f * (dir.y + 1.0f);
             Vec3 sky = Vec3(1, 1, 1) * (1 - t) + Vec3(0.4f, 0.6f, 1.0f) * t; // blend white and blue
             return ans + sky * weight;
-            // continue;
         }
     
         // The point we hit, and the surface normal there.
         Vec3 p = origin + dir * tHit;
-    
-        // hit is the index of the sphere that was hit. 
-        // p − center is an arrow from the sphere’s centre out to the hit point, 
-        // which is perpendicular to the surface there.
         Vec3 n = normalize(p - scene[hit].center); // Surface Normal
     
         // Base color: checkerboard for the floor, solid color otherwise.
@@ -152,12 +142,11 @@ __device__ Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {// Origin
     
         Vec3 reflectedDir = dir - n * (2.0f * dot(dir, n)); // For reflection
     
-        //CheckerBoard color Logic
+        // checkerboard
         if (scene[hit].isFloor) {
             int cx = (int)std::floor(p.x), cz = (int)std::floor(p.z);
             bool white = ((cx + cz) & 1) == 0;
             base = white ? Vec3(0.9f, 0.9f, 0.9f) : Vec3(0.2f, 0.2f, 0.2f);
-            // base = white ? Vec3(0.0, 0.0, 0.0) : Vec3(1, 1, 1)*2;
         }
     
         // Diffuse lighting: how directly does the surface face the light?
@@ -182,8 +171,6 @@ __device__ Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {// Origin
         float x  = 1.0f - cosTheta;
         float x2 = x * x;
         float F  = k + (1.0f - k) * (x2 * x2 * x);   // x^5 without pow (pow would run in double)
-
-        // Vec3 reflected_color = rayColor(p + n*0.001f, reflectedDir, bounces-1);
         origin = p + n*0.001f; dir = reflectedDir;
 
         ans = ans + local_color * ((1.0f - F) * weight);

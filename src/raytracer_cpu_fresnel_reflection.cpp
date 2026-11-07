@@ -1,6 +1,6 @@
-// ============================================================================
-//  Basic CPU ray tracer  --  starter code
-// ============================================================================
+// CPU ray tracer with Fresnel (Schlick) reflections, computed in a loop.
+// The recursive version is kept for comparison. Scene settings come from config.h.
+// Build: g++ -O2 -o cpu_fresnel raytracer_cpu_fresnel_reflection.cpp
 //  Renders a few spheres on a checkerboard floor, with simple diffuse shading
 //  and hard shadows. Single-threaded, plain C++. No external libraries.
 //
@@ -47,9 +47,7 @@ std::vector<Sphere> scene = {
     { Vec3( 1.1f, 0.0f, -1),    0.5f, Vec3(0.2f, 0.4f, 0.9f), BALL_K, false }, // blue
 };
 
-// A ray is a point p(t) = origin + t * dir. This finds where (if anywhere) the
-// ray hits the sphere, returning the nearest distance t in front of the camera,
-// or -1 if it misses. (Solves a quadratic -- see any ray-sphere reference.)
+// Ray-sphere hit: nearest distance t along the ray, or -1 on a miss.
 float hitSphere(const Sphere& s, Vec3 origin, Vec3 dir) {
     Vec3  oc = origin - s.center;
     float a = dot(dir, dir);
@@ -123,9 +121,7 @@ Vec3 rayColorRecursive(Vec3 origin, Vec3 dir, int bounces) {
 
 
 // Compute the color seen along one ray.
-Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {// Origin is the CameraPosition, Dir
-    // TRY IT: move the light around and see how shading/shadows change.
-    // x = right, y = up, z = toward the camera.
+Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {
     Vec3  lightPos(4, 6, 2);
 
     Vec3 ans = {0.0, 0.0, 0.0};
@@ -134,23 +130,18 @@ Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {// Origin is the Cam
 
     bounces++;
     while(bounces--){
-        float tHit; //This stores the closest hit point
-        int hit = closestHit(origin, dir, tHit); //The sphere which is being hit by the ray
+        float tHit;
+        int hit = closestHit(origin, dir, tHit);
         
         if (hit < 0) {
             // Miss: draw a simple sky gradient (white near horizon -> blue up top).
             float t = 0.5f * (dir.y + 1.0f);
             Vec3 sky = Vec3(1, 1, 1) * (1 - t) + Vec3(0.4f, 0.6f, 1.0f) * t; // blend white and blue
             return ans + sky * weight;
-            // continue;
         }
     
         // The point we hit, and the surface normal there.
         Vec3 p = origin + dir * tHit;
-    
-        // hit is the index of the sphere that was hit. 
-        // p − center is an arrow from the sphere’s centre out to the hit point, 
-        // which is perpendicular to the surface there.
         Vec3 n = normalize(p - scene[hit].center); // Surface Normal
     
         // Base color: checkerboard for the floor, solid color otherwise.
@@ -158,12 +149,11 @@ Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {// Origin is the Cam
     
         Vec3 reflectedDir = dir - n * (2.0f * dot(dir, n)); // For reflection
     
-        //CheckerBoard color Logic
+        // checkerboard
         if (scene[hit].isFloor) {
             int cx = (int)std::floor(p.x), cz = (int)std::floor(p.z);
             bool white = ((cx + cz) & 1) == 0;
             base = white ? Vec3(0.9f, 0.9f, 0.9f) : Vec3(0.2f, 0.2f, 0.2f);
-            // base = white ? Vec3(0.0, 0.0, 0.0) : Vec3(1, 1, 1)*2;
         }
     
         // Diffuse lighting: how directly does the surface face the light?
@@ -188,8 +178,6 @@ Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {// Origin is the Cam
         float x  = 1.0f - cosTheta;
         float x2 = x * x;
         float F  = k + (1.0f - k) * (x2 * x2 * x);   // x^5 without pow (pow would run in double)
-
-        // Vec3 reflected_color = rayColor(p + n*0.001f, reflectedDir, bounces-1);
         origin = p + n*0.001f; dir = reflectedDir;
 
         ans = ans + local_color * ((1.0f - F) * weight);
@@ -199,11 +187,8 @@ Vec3 rayColorIterative(Vec3 origin, Vec3 dir, int bounces) {// Origin is the Cam
 }
 
 int main() {
-    const int W = WIDTH, H = HEIGHT; //Setup image dimensions
-    std::vector<unsigned char> image(W * H * 3);//Total Pixels - Stored as (R, G, B per pixel)
-
-    // TRY IT: move the camera and see how the view changes.
-    // x = right, y = up, z = toward the viewer (spheres sit near z = -1).
+    const int W = WIDTH, H = HEIGHT;
+    std::vector<unsigned char> image(W * H * 3);
     Vec3  cameraPos(0, 1, 3);
     float aspect = (float)W / H;
 
